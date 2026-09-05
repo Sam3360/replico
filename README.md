@@ -44,7 +44,7 @@ Developer pushes code        →  CI fails  →  Developer reads logs
 ```text
 GitHub Actions fails
         ↓
-replico <run-url>                    # or: replico run <run-id>
+replico <run-url>                    # or: replico run <run-id>; `rep` works too
         ↓
 Analyze the failed workflow
         ↓

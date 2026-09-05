@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from replico.cli import main
+from replico.cli import main, rep_main
 
 
 def test_version(capsys):
@@ -15,6 +15,14 @@ def test_version(capsys):
 
 def test_version_command(capsys):
     assert main(["version"]) == 0
+    assert capsys.readouterr().out.startswith("replico ")
+
+
+def test_rep_alias(capsys):
+    """`rep` is a real console-script alias of `replico`."""
+    assert rep_main(["--version"]) == 0
+    assert capsys.readouterr().out.startswith("replico ")
+    assert rep_main(["version"]) == 0
     assert capsys.readouterr().out.startswith("replico ")
 
 

@@ -383,5 +383,14 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_INTERNAL
 
 
+def rep_main(argv: list[str] | None = None) -> int:
+    """Entry point for the ``rep`` console-script alias of ``replico``.
+
+    Identical to :func:`main`; the two are separate entry points only so
+    that both ``replico`` and ``rep`` can be installed as console scripts.
+    """
+    return main(argv)
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

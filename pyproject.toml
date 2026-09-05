@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "replico"
-version = "0.2.1"
+version = "0.2.2"
 description = "Turn GitHub Actions CI failures into locally reproducible failures."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -57,6 +57,7 @@ dev = [
 
 [project.scripts]
 replico = "replico.cli:main"
+rep = "replico.cli:rep_main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/replico"]

@@ -4,6 +4,15 @@ All notable changes to Replico are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and semantic
 versioning (see [pyproject.toml](pyproject.toml)).
 
+## [0.2.2] - 2026-09-05
+
+### Added
+
+- **`rep` console-script alias** — `rep` is now installed as a real
+  binary next to `replico` and accepts exactly the same commands
+  (`rep <run-url>`, `rep diagnose`, `rep rerun`, …). Zero behavior
+  differences; only a shorter command name.
+
 ## [0.2.1] - 2026-09-05
 
 Bug fixes discovered by dogfooding Replico end to end and by running
