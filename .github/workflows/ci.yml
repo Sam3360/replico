@@ -28,9 +28,10 @@ jobs:
       - name: Test (offline suite, mocked GitHub)
         run: python -m pytest -q
         env:
-          # Never reach out to the network during tests.
+          # Never reach out to the network during tests. GitHub Actions env
+          # names are case-insensitive, so a lowercase `no_proxy` twin of
+          # `NO_PROXY` would be rejected as a duplicate key.
           NO_PROXY: "*"
-          no_proxy: "*"
 
   quality:
     name: lint + types

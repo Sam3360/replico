@@ -4,6 +4,26 @@ All notable changes to Replico are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and semantic
 versioning (see [pyproject.toml](pyproject.toml)).
 
+## [0.2.1] - 2026-09-05
+
+Bug fixes discovered by dogfooding Replico end to end and by running
+Replico's own CI.
+
+### Fixed
+
+- **`replico rerun` verdict** — the previously reproduced failure was
+  misreported as "a different failure now occurs locally" when CI logs
+  were not accessible (no token) and the workflow had no pytest tests.
+  Rerun now compares the fresh WhyFail diagnosis against the saved one
+  (exception type + message or file/function location) and reports
+  `REPRODUCED` with the matching failure signature (`KeyError at
+  failure.py in load`) when they agree.
+- **Replico's own CI workflow** — GitHub Actions rejects duplicate env
+  names case-insensitively, so `NO_PROXY` + `no_proxy` made the whole
+  workflow fail validation with zero jobs started. Removed the lowercase
+  duplicate. This is the first real self-dogfooding fix: our CI failed,
+  and the failure was found by inspecting the failed run.
+
 ## [0.2.0] - 2026-09-04
 
 WhyFail integration: reproduced Python failures are now diagnosed locally
