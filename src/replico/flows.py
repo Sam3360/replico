@@ -16,10 +16,13 @@ from replico.analysis import classifier as clsf
 from replico.analysis.whyfail_adapter import (
     WhyFailResult,
     describe_reason,
+    failure_signatures,
     find_python_invocation,
+    matching_signatures,
     render_diagnosis,
     run_diagnosis,
     should_diagnose,
+    signature_label,
     whyfail_available,
 )
 from replico.config import Config
@@ -444,6 +447,36 @@ def rerun(ctx: AppContext, options: ReproOptions) -> Outcome:
     ci_category = (payload.get("classification") or {}).get("category")
     now_failed = not result.ok
     local_tests = local_evidence.failing_tests
+
+    # -- diagnosis (WhyFail) ---------------------------------------------------
+    # Run before the verdict: for Python failures, comparing the fresh
+    # diagnosis against the saved one is the strongest evidence of whether
+    # the *same* failure still reproduces (test names and CI log categories
+    # are unavailable when CI logs were not accessible).
+    whyfail_result: WhyFailResult | None = None
+    whyfail_reason = ""
+    if now_failed or options.diagnose is True:
+        plan["target_entries"] = [target]
+        plan["cwd"] = _cwd_for(ctx, target)
+        whyfail_result, whyfail_reason = attempt_local_diagnosis(
+            ctx,
+            ecosystems=["python"] if plan.get("venv") else [],
+            plan=plan,
+            local_failed=now_failed,
+            flag=options.diagnose,
+        )
+    else:
+        whyfail_reason = "no_local_failure"
+
+    fresh_signatures: list[dict] = []
+    saved_signatures: list[dict] = []
+    same_diagnosis: list[dict] = []
+    if whyfail_result is not None and whyfail_result.diagnosed:
+        fresh_signatures = failure_signatures(whyfail_result.diagnostics)
+        saved_doc = ctx.store.read_whyfail() or {}
+        saved_signatures = failure_signatures(saved_doc.get("diagnostics") or [])
+        same_diagnosis = matching_signatures(fresh_signatures, saved_signatures)
+
     matched = sorted(set(ci_tests) & set(local_tests))
 
     if not now_failed:
@@ -460,7 +493,14 @@ def rerun(ctx: AppContext, options: ReproOptions) -> Outcome:
         same_category = bool(ci_category) and (
             clsf.classify(local_evidence).category == ci_category
         )
-        if not ci_tests and same_category:
+        if same_diagnosis:
+            verdict = Verdict.REPRODUCED
+            headline = "The reproduced failure still exists locally."
+            reasons = [
+                "the same diagnosed failure still occurs locally: "
+                + ", ".join(signature_label(s) for s in same_diagnosis)
+            ]
+        elif not ci_tests and same_category:
             verdict = Verdict.REPRODUCED
             headline = "A failure matching CI still occurs locally."
             reasons = [f"failure category {ci_category} still reproduces"]
@@ -468,6 +508,14 @@ def rerun(ctx: AppContext, options: ReproOptions) -> Outcome:
             verdict = Verdict.PARTIALLY_REPRODUCED
             headline = "A different failure now occurs locally."
             reasons = ["the previously reproduced failure appears to be gone"]
+            if fresh_signatures and saved_signatures:
+                reasons.append(
+                    "previously diagnosed: "
+                    + ", ".join(signature_label(s) for s in saved_signatures)
+                )
+                reasons.append(
+                    "now diagnosed: " + ", ".join(signature_label(s) for s in fresh_signatures)
+                )
             if local_tests:
                 reasons.append("still failing locally: " + ", ".join(local_tests))
             if ci_tests:
@@ -477,26 +525,11 @@ def rerun(ctx: AppContext, options: ReproOptions) -> Outcome:
     ui.section("Local result")
     _render_local_result(ui, result, local_evidence)
 
-    # -- diagnosis (WhyFail) ---------------------------------------------------
-    whyfail_result: WhyFailResult | None = None
-    whyfail_reason = ""
-    if now_failed or options.diagnose is True:
-        plan["target_entries"] = [target]
-        plan["cwd"] = _cwd_for(ctx, target)
-        whyfail_result, whyfail_reason = attempt_local_diagnosis(
-            ctx,
-            ecosystems=["python"] if plan.get("venv") else [],
-            plan=plan,
-            local_failed=now_failed,
-            flag=options.diagnose,
-        )
-        if whyfail_result is not None:
-            ui.section("WhyFail diagnosis")
-            render_diagnosis(ui, whyfail_result)
-        elif options.diagnose is True:
-            ui.warn(f"WhyFail diagnosis skipped: {describe_reason(whyfail_reason)}")
-    else:
-        whyfail_reason = "no_local_failure"
+    if whyfail_result is not None:
+        ui.section("WhyFail diagnosis")
+        render_diagnosis(ui, whyfail_result)
+    elif options.diagnose is True:
+        ui.warn(f"WhyFail diagnosis skipped: {describe_reason(whyfail_reason)}")
 
     ui.rule()
     ui.out(_result_banner(verdict), style=_style_for(verdict))
@@ -522,6 +555,10 @@ def rerun(ctx: AppContext, options: ReproOptions) -> Outcome:
             "reason": whyfail_result.reason,
             "summary": whyfail_result.summary(),
         }
+        if same_diagnosis:
+            rerun_entry["diagnosis"]["same_as_saved"] = [signature_label(s) for s in same_diagnosis]
+        if same_diagnosis:
+            rerun_entry["diagnosis"]["same_as_saved"] = [signature_label(s) for s in same_diagnosis]
     reruns.append(rerun_entry)
     payload["reruns"] = reruns
     whyfail_doc = _whyfail_payload_doc(whyfail_result, whyfail_reason)

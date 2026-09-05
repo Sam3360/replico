@@ -147,6 +147,82 @@ def primary_confidence(diagnostics: list[DiagnosisEntry]) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Failure signatures (comparing diagnoses across runs)
+# ---------------------------------------------------------------------------
+
+
+def _normalized_diagnostic(raw: Any) -> dict[str, Any] | None:
+    """Accept either a CLI entry ``{"context", "diagnostic"}`` or a bare
+    diagnostic dict and return the inner diagnostic (or None)."""
+    if isinstance(raw, dict) and isinstance(raw.get("diagnostic"), dict):
+        return raw["diagnostic"]
+    return raw if isinstance(raw, dict) else None
+
+
+def failure_signatures(diagnostics: list[Any]) -> list[dict[str, Any]]:
+    """Compact identity of each diagnosed failure: exception type plus
+    message and user-code location. Used to recognize when a re-run hits
+    the *same* failure as a previous diagnosis."""
+    signatures: list[dict[str, Any]] = []
+    for raw in diagnostics or []:
+        diagnostic = _normalized_diagnostic(raw)
+        if diagnostic is None:
+            continue
+        exception_type = diagnostic.get("exception_type")
+        if not exception_type:
+            continue
+        location = diagnostic.get("location") or {}
+        signatures.append(
+            {
+                "exception_type": str(exception_type),
+                "message": diagnostic.get("message"),
+                "filename": location.get("filename"),
+                "function": location.get("function"),
+            }
+        )
+    return signatures
+
+
+def matching_signatures(
+    fresh: list[dict[str, Any]], saved: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Signatures from ``fresh`` that also occur in ``saved``.
+
+    Two signatures describe the same failure when the exception type matches
+    and either the message or the file+function location agrees — tolerant
+    of small line shifts, but refusing to conflate different failures.
+    """
+    matches: list[dict[str, Any]] = []
+    for sig in fresh:
+        for other in saved:
+            if sig.get("exception_type") != other.get("exception_type"):
+                continue
+            same_message = sig.get("message") is not None and sig.get("message") == other.get(
+                "message"
+            )
+            same_place = (
+                sig.get("filename") is not None
+                and sig.get("filename") == other.get("filename")
+                and sig.get("function") == other.get("function")
+            )
+            if same_message or same_place:
+                matches.append(sig)
+                break
+    return matches
+
+
+def signature_label(sig: dict[str, Any]) -> str:
+    """Human-readable one-liner for a failure signature."""
+    label = str(sig.get("exception_type") or "unknown exception")
+    filename = sig.get("filename")
+    if filename:
+        label += f" at {filename}"
+        if sig.get("function"):
+            label += f" in {sig['function']}"
+    return label
+
+
+# ---------------------------------------------------------------------------
 # Availability
 # ---------------------------------------------------------------------------
 
