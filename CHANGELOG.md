@@ -4,6 +4,27 @@ All notable changes to Replico are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and semantic
 versioning (see [pyproject.toml](pyproject.toml)).
 
+## [0.2.3] - 2026-09-05
+
+Cross-platform fixes found by running Replico's own CI (the v0.2.1 CI
+matrix shook out three real bugs that only appear on Linux runners).
+
+### Fixed
+
+- **Python `'3'` requests now match any Python 3.x** — a workflow with
+  `python-version: '3'` (or `'3.x'`) reported `matches_request=False` for
+  every local interpreter, which made `_pick_isolation` wrongly force
+  Docker when Docker was available (e.g. on Ubuntu runners) and skip the
+  local venv + WhyFail diagnosis. Requests are now matched like
+  setup-python: a bare major matches any same-major version.
+- **`replico reproduce` no longer targets `$GITHUB_RUN_ID`** — when run
+  inside GitHub Actions (where `GITHUB_RUN_ID` is set), a bare
+  `replico reproduce` silently reproduced the ambient CI run instead of
+  reporting "missing run". Only the explicit `replico run` command reads
+  the environment fallback now.
+- **Regression tests** for both, plus the `rep` alias test from 0.2.2
+  upstreamed into the CLI suite.
+
 ## [0.2.2] - 2026-09-05
 
 ### Added

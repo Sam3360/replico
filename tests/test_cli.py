@@ -56,6 +56,19 @@ def test_missing_target_exit_3(capsys):
     assert "missing run" in capsys.readouterr().out
 
 
+def test_reproduce_without_target_ignores_ambient_ci_run(capsys, monkeypatch):
+    """A bare `replico reproduce` must not silently target $GITHUB_RUN_ID.
+
+    Regression for a bug where running inside GitHub Actions (where
+    GITHUB_RUN_ID is set) made `replico reproduce` with no target target the
+    ambient CI run instead of reporting a missing run.
+    """
+    monkeypatch.setenv("GITHUB_REPOSITORY", "octocat/demo")
+    monkeypatch.setenv("GITHUB_RUN_ID", "123456789")
+    assert main(["reproduce"]) == 3
+    assert "missing run" in capsys.readouterr().out
+
+
 def test_invalid_url_exit_3(capsys):
     assert main(["https://example.com/not-a-run"]) == 3
 

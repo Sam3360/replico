@@ -39,6 +39,31 @@ def parse_python_request(text: str) -> str | None:
     return f"{major}.{minor}" if minor else major
 
 
+def _matches_request(version: tuple[int, int, int], requested: str | None) -> bool:
+    """Whether an installed version satisfies a CI python-version request.
+
+    * ``'3'``/``'3.x'`` matches any Python 3.x (GitHub's setup-python semantics).
+    * ``'3.12'`` matches exactly (major, minor).
+    * ``'>=3.12'`` etc. is treated as a loose floor (best effort).
+    """
+    if requested is None:
+        return False
+    text = requested.strip().lower()
+    op_match = re.match(r"^(>=|~=|==)?\s*(\d+)(?:\.(\d+))?", text)
+    if not op_match:
+        return False
+    op = op_match.group(1) or "=="
+    major = int(op_match.group(2))
+    minor = op_match.group(3)
+    if minor is None or minor.lower() in ("x", "*"):
+        # Major-only request: any same-major satisfies it.
+        return version[0] == major
+    minor_i = int(minor)
+    if op == ">=":
+        return (version[0], version[1]) >= (major, minor_i)
+    return (version[0], version[1]) == (major, minor_i)
+
+
 def probe_python_version(executable: str) -> tuple[int, int, int] | None:
     """Return the version of a python executable, or None on any failure."""
     try:
@@ -95,7 +120,7 @@ def find_python(request: str | None) -> PythonRuntime:
         version = probe_python_version(path)
         if version is None:
             continue
-        match = bool(target and version[:2] == target)
+        match = _matches_request(version, requested)
         if runtime is None or match:
             runtime = PythonRuntime(
                 executable=path, version=version, how=f"found {name} on PATH", matches_request=match
@@ -118,7 +143,7 @@ def find_python(request: str | None) -> PythonRuntime:
                         executable=f"{py_launcher} {flag}",
                         version=version,
                         how=f"py launcher {flag}",
-                        matches_request=bool(target and version[:2] == target),
+                        matches_request=_matches_request(version, requested),
                     )
                     if candidate.matches_request:
                         return candidate

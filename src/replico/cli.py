@@ -304,8 +304,11 @@ def _run(argv: list[str]) -> int:
                 outcome = rerun(ctx, options)
             else:
                 target = getattr(args, "target", None)
-                if target is None:
-                    # `replico run` may read the run id from the environment.
+                if target is None and command == "run":
+                    # Only the explicit `replico run` command reads the run id
+                    # from the environment (for reproducing a CI job's own run
+                    # from inside a workflow step). A bare `replico reproduce`
+                    # must never silently target `$GITHUB_RUN_ID`.
                     target = _env_run_id()
                 if target is None:
                     raise InvalidInputError(
